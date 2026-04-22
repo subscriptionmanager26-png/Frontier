@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thread UI demo — localhost</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">Dark</button>
+
+    <div class="shell">
+      <p class="banner">
+        <strong>Reply line:</strong> <em>reply icon</em> + for <strong>text</strong> targets, a short excerpt of the
+        parent; for <strong>image / video / card / table</strong>, <code>attached …</code> + type icon + optional name.
+        <strong>Long-press</strong> or <strong>right‑click</strong> a message. Run
+        <code>npm run demo-threads</code> → <code>http://localhost:3457</code>
+      </p>
+
+      <!-- Thread list -->
+      <div class="panel view" id="view-list" aria-label="Threads">
+        <header class="panel-header">
+          <h1>Threads</h1>
+          <button type="button" class="btn-ghost" id="btn-new-thread">+ New</button>
+        </header>
+        <ul class="thread-list" id="thread-list"></ul>
+      </div>
+
+      <!-- Single thread (no sub-threads; flat timeline) -->
+      <div class="panel view hidden" id="view-thread" aria-label="Thread messages">
+        <header class="panel-header thread-header">
+          <button type="button" class="btn-back" id="btn-back" aria-label="Back to threads">← Back</button>
+          <h1 id="thread-title">Thread</h1>
+        </header>
+        <div class="messages" id="messages"></div>
+        <footer class="composer">
+          <div class="reply-context hidden" id="reply-context">
+            <div class="reply-context-inner" id="reply-context-inner"></div>
+            <button type="button" class="reply-cancel" id="reply-cancel" aria-label="Cancel reply">✕</button>
+          </div>
+          <div class="composer-row">
+            <textarea id="composer-input" rows="1" placeholder="Message…" maxlength="4000"></textarea>
+            <button type="button" class="btn-send" id="btn-send">Send</button>
+          </div>
+        </footer>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

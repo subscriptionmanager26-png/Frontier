@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>MCP Server Manager — UI demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">Dark mode</button>
+
+    <div class="page">
+      <p class="banner">
+        Static demo for layout only. Run: <code>npx serve .</code> or <code>python3 -m http.server 8080</code> from
+        <code>web-demo/</code>
+      </p>
+
+      <div class="phone" role="application" aria-label="App preview">
+        <header class="status-bar">
+          <div class="status-bar-wrap">
+            <span id="header-title">Chat</span>
+            <span id="chat-actions">
+              <button type="button" class="icon-btn" id="open-conv-modal" aria-label="Conversations">☰</button>
+            </span>
+            <span id="servers-actions" hidden>
+              <button type="button" class="plus-btn" aria-label="Add server">+</button>
+            </span>
+          </div>
+        </header>
+
+        <!-- Chat -->
+        <section class="screen active" data-screen="chat">
+          <div class="chat-messages" id="chat-messages">
+            <p class="hint">
+              Message the assistant. Configure OpenAI in Settings; MCP tools use the starred server (or the first
+              server with credentials).
+            </p>
+            <div class="bubble assistant">
+              <div class="label">Assistant</div>
+              <div class="body">
+                Welcome — this is sample copy. The mobile app stores chats in SQLite and calls OpenAI with optional MCP
+                tools.
+              </div>
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Message…" autocomplete="off" />
+            <button type="button" class="send-btn" id="send-btn" aria-label="Send">➤</button>
+          </div>
+        </section>
+
+        <!-- Servers -->
+        <section class="screen" data-screen="servers">
+          <p class="servers-hint">Tap ☆ to choose which MCP server the assistant uses for tools.</p>
+          <div class="servers-list">
+            <div class="server-row">
+              <button type="button" class="star active" aria-pressed="true">★</button>
+              <button type="button" class="server-main">
+                <span>
+                  <div class="server-title">Sample MCP</div>
+                  <div class="server-url">https://api.example.com/mcp</div>
+                  <div class="badge">STREAMABLE</div>
+                </span>
+                <span class="chev">›</span>
+              </button>
+            </div>
+            <div class="server-row">
+              <button type="button" class="star" aria-pressed="false">☆</button>
+              <button type="button" class="server-main">
+                <span>
+                  <div class="server-title">Another server</div>
+                  <div class="server-url">https://mcp.local/v1</div>
+                  <div class="badge">STREAMABLE</div>
+                </span>
+                <span class="chev">›</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="screen" data-screen="settings">
+          <div class="settings-scroll">
+            <h2 class="section-title">OpenAI</h2>
+            <p class="help">
+              Your key stays on this device (SecureStore). It is sent only to OpenAI’s API from the app.
+            </p>
+            <input class="field" type="password" placeholder="sk-…" value="" autocomplete="off" />
+            <button type="button" class="btn-primary">Save API key</button>
+
+            <h2 class="section-title mt">Model</h2>
+            <div class="model-list">
+              <button type="button" class="model-chip selected">GPT-4o mini</button>
+              <button type="button" class="model-chip">GPT-4o</button>
+              <button type="button" class="model-chip">GPT-4.1 mini</button>
+              <button type="button" class="model-chip">o4-mini</button>
+            </div>
+
+            <h2 class="section-title mt">Notifications</h2>
+            <div class="row">
+              <span>Enable local notifications</span>
+              <input type="checkbox" class="switch" checked aria-label="Notifications" />
+            </div>
+            <button type="button" class="btn-outline" id="test-notify">Send test notification</button>
+
+            <h2 class="section-title mt">Background (approximate)</h2>
+            <p class="help">
+              iOS and Android do not allow true cron. Expo schedules background fetch about every 15 minutes when the OS
+              allows.
+            </p>
+            <div class="row">
+              <span>Background fetch + notify</span>
+              <input type="checkbox" class="switch" aria-label="Background fetch" />
+            </div>
+            <label class="help" for="bg-text">Notification body when fetch runs</label>
+            <input class="field" id="bg-text" value="Scheduled check-in" />
+
+            <p class="footer-note">
+              MCP Server Manager — chat uses OpenAI; optional tools use your active (starred) MCP server.
+            </p>
+          </div>
+        </section>
+
+        <nav class="tab-bar" aria-label="Main tabs">
+          <button type="button" class="tab active" data-tab="chat">
+            <span class="emoji" aria-hidden="true">💬</span>
+            Chat
+          </button>
+          <button type="button" class="tab" data-tab="servers">
+            <span class="emoji" aria-hidden="true">🔌</span>
+            Servers
+          </button>
+          <button type="button" class="tab" data-tab="settings">
+            <span class="emoji" aria-hidden="true">⚙</span>
+            Settings
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-sheet" role="document">
+        <h2 class="modal-title" id="modal-title">Conversations</h2>
+        <button type="button" class="modal-new" id="new-chat">New chat</button>
+        <button type="button" class="conv-item active">
+          <div>Portfolio questions</div>
+          <div class="conv-meta">Today, 2:30 PM</div>
+        </button>
+        <button type="button" class="conv-item">
+          <div>New chat</div>
+          <div class="conv-meta">Yesterday</div>
+        </button>
+        <button type="button" class="modal-close" id="close-modal">Close</button>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

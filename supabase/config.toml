@@ -1,0 +1,5 @@
+# Minimal config — run `supabase link` to fill project_id, or deploy with `supabase functions deploy a2a-gateway --project-ref <ref>`
+
+[functions.a2a-gateway]
+# Public A2A endpoint (Bearer optional via A2A_EXPECTED_TOKEN in function secrets)
+verify_jwt = false

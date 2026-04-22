@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Frontier",
+    "slug": "frontier",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "frontier",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF0E5"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch"],
+        "CFBundleDisplayName": "Frontier"
+      },
+      "bundleIdentifier": "com.frontier.app"
+    },
+    "android": {
+      "label": "Frontier",
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "com.frontier.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_SUPABASE_URL": "https://nmnzcpqjebwkrutmyflh.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tbnpjcHFqZWJ3a3J1dG15ZmxoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NjM4MzEsImV4cCI6MjA5MTEzOTgzMX0.sO7I83lU1DXq5DRxzbHuecYVNKKmA2d2zcc90JSVEMc",
+      "router": {},
+      "eas": {
+        "projectId": "fac863ca-0ed1-44a8-8df0-74d9090aa246"
+      }
+    }
+  }
+}
