@@ -231,6 +231,8 @@ export class A2aService {
     const existing = await getA2aSessionMap(threadId);
     const safeUserMessage = (args.userMessage || '').trim();
     const boundedContext = args.context?.slice(0, 4000);
+    /** A2A v1: stable `contextId` across turns in one UI thread; server may echo it on the `Task`. */
+    const contextIdForSend = existing?.sessionId?.trim() || uuid();
     // Product rule: each new user turn creates a new taskId.
     // Prior task linkage is carried via referenceTaskIds, not taskId continuation.
     const continuationTaskId = undefined;
@@ -266,7 +268,7 @@ export class A2aService {
       // Strict A2A mode: never auto-reuse previous taskId for new turns.
       // Continue via taskId only for interrupted tasks; otherwise contextId + referenceTaskIds.
       taskId: continuationTaskId,
-      contextId: existing?.sessionId ?? undefined,
+      contextId: contextIdForSend,
       referenceTaskIds,
       userMessage: safeUserMessage,
       context: boundedContext,
@@ -289,7 +291,7 @@ export class A2aService {
         prompt: safeUserMessage,
       } as any ),
     });
-    const safeSessionId = submit.sessionId || existing?.sessionId || submit.taskId;
+    const safeSessionId = submit.sessionId?.trim() || contextIdForSend;
     const safeTaskId = submit.taskId || existing?.lastTaskId || uuid();
     await upsertA2aSessionMap({
       threadId,
@@ -313,6 +315,36 @@ export class A2aService {
       },
     });
     args.onSubmitted?.({ taskId: safeTaskId, sessionId: safeSessionId, correlationId });
+
+    /** A2A v1: agents may return only `message` (no task) — never poll GetTask in that case. */
+    if (submit.status === 'completed' && submit.messageOnly) {
+      markSuccess(cfg.baseUrl);
+      args.onState?.('completed');
+      await upsertA2aSessionMap({
+        threadId,
+        agentUrl: cfg.baseUrl,
+        sessionId: safeSessionId,
+        lastTaskId: safeTaskId,
+        lastTaskStatus: 'completed',
+      });
+      await logA2aHop({
+        level: 'info',
+        requestId,
+        correlationId,
+        sessionId: safeSessionId,
+        taskId: safeTaskId,
+        agentUrl: cfg.baseUrl,
+        hop: 'task.message_only_completed',
+        status: 'completed',
+      });
+      return {
+        taskId: safeTaskId,
+        sessionId: safeSessionId,
+        status: 'completed',
+        output: submit.output,
+        traceId: submit.traceId,
+      };
+    }
 
     // A2A-compliant per-task registration. Optional on many gateways; must not fail the user turn if unsupported.
     if (trimmedHook.length > 0) {

@@ -175,13 +175,15 @@ async function appendInboundTranscriptFromGateway(
   ownerUserId: string,
   peerRpcUrl: string | null,
   body: string,
-  taskId: string,
+  gatewayTaskId: string,
   pathSlug: string,
+  transcript: { contextId: string; a2aMessageId?: string; referenceTaskIds?: string[] },
 ): Promise<void> {
   const peer = peerRpcUrl?.trim();
   if (!peer) return;
   const threadId = directMessageThreadIdForOwner(ownerUserId, peer);
-  const dedupe = `gw:${taskId}`;
+  const msgId = transcript.a2aMessageId?.trim();
+  const dedupe = msgId ? `gw:msg:${msgId}` : `gw:${gatewayTaskId}`;
   const { error } = await serviceSb.from("direct_message_events").insert({
     user_id: ownerUserId,
     thread_id: threadId,
@@ -189,7 +191,13 @@ async function appendInboundTranscriptFromGateway(
     body: (body || "(empty message)").slice(0, 20000),
     source: "gateway",
     dedupe_key: dedupe,
-    metadata: { taskId, pathSlug },
+    metadata: {
+      taskId: gatewayTaskId,
+      pathSlug,
+      contextId: transcript.contextId,
+      a2aMessageId: msgId ?? null,
+      referenceTaskIds: transcript.referenceTaskIds ?? [],
+    },
   });
   if (error?.code === "23505") return;
   if (error) {
@@ -219,6 +227,7 @@ async function recordInboundIfApplicable(
   taskId: string,
   /** Stable A2A context (client session); same across turns in one UI thread, new per new thread. */
   contextId: string,
+  a2aMeta: { a2aMessageId?: string; referenceTaskIds?: string[] } = {},
 ): Promise<{ status: string; detail?: string }> {
   try {
     const senderId = await resolveSenderUserIdFromRequest(req);
@@ -299,14 +308,11 @@ async function recordInboundIfApplicable(
         .eq("id", existing.id);
       console.log("[DBG583810][inbound] updated_row", JSON.stringify({ id: existing.id, ok: !updErr, err: updErr?.message ?? null }));
       if (updErr) return { status: "update_error", detail: updErr.message };
-      await appendInboundTranscriptFromGateway(
-        serviceSb,
-        ownerRow.user_id,
-        senderRpc,
-        preview,
-        taskId,
-        pathSlug,
-      );
+      await appendInboundTranscriptFromGateway(serviceSb, ownerRow.user_id, senderRpc, preview, taskId, pathSlug, {
+        contextId,
+        a2aMessageId: a2aMeta.a2aMessageId,
+        referenceTaskIds: a2aMeta.referenceTaskIds,
+      });
       return { status: "updated" };
     } else {
       const { error: insErr } = await serviceSb.from("agent_inbound_notifications").insert({
@@ -324,14 +330,11 @@ async function recordInboundIfApplicable(
       });
       console.log("[DBG583810][inbound] inserted_row", JSON.stringify({ pathSlug, ok: !insErr, err: insErr?.message ?? null }));
       if (insErr) return { status: "insert_error", detail: insErr.message };
-      await appendInboundTranscriptFromGateway(
-        serviceSb,
-        ownerRow.user_id,
-        senderRpc,
-        preview,
-        taskId,
-        pathSlug,
-      );
+      await appendInboundTranscriptFromGateway(serviceSb, ownerRow.user_id, senderRpc, preview, taskId, pathSlug, {
+        contextId,
+        a2aMessageId: a2aMeta.a2aMessageId,
+        referenceTaskIds: a2aMeta.referenceTaskIds,
+      });
       return { status: "inserted" };
     }
   } catch (e) {
@@ -514,12 +517,25 @@ Deno.serve(async (req: Request) => {
     }
 
     if (method === "SendMessage") {
+      const inMsg = (params.message ?? {}) as Record<string, unknown>;
       const inputText = readIncomingText(params);
-      const taskId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const contextId = String(params.contextId || taskId);
+      const gatewayTaskId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const refRaw = inMsg.referenceTaskIds ?? inMsg.reference_task_ids;
+      const referenceTaskIds = Array.isArray(refRaw) ? refRaw.map((x) => String(x)) : [];
+      const a2aMessageIdRaw = inMsg.messageId ?? inMsg.message_id;
+      const a2aMessageId = typeof a2aMessageIdRaw === "string" ? a2aMessageIdRaw.trim() : "";
+      const ctxRaw =
+        inMsg.contextId ?? inMsg.context_id ?? (params as Record<string, unknown>).contextId ??
+        (params as Record<string, unknown>).context_id;
+      const contextId = String(
+        typeof ctxRaw === "string" && ctxRaw.trim() ? ctxRaw.trim() : gatewayTaskId,
+      );
       let inboundDebug: { status: string; detail?: string } | null = null;
       if (sb) {
-        inboundDebug = await recordInboundIfApplicable(sb, req, pathSlug, inputText, taskId, contextId);
+        inboundDebug = await recordInboundIfApplicable(sb, req, pathSlug, inputText, gatewayTaskId, contextId, {
+          a2aMessageId: a2aMessageId || undefined,
+          referenceTaskIds,
+        });
       } else {
         inboundDebug = { status: "sb_unavailable" };
       }
@@ -546,8 +562,8 @@ Deno.serve(async (req: Request) => {
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           const task = {
-            taskId,
-            id: taskId,
+            taskId: gatewayTaskId,
+            id: gatewayTaskId,
             sessionId: contextId,
             contextId,
             status: {
@@ -557,14 +573,14 @@ Deno.serve(async (req: Request) => {
             state: "failed",
             metadata: { sequenceNumber: 1, sbAvailable: !!sb, legacyMode, pathSlug, inboundDebug },
           };
-          taskStore.set(`${pathSlug}:${taskId}`, task);
+          taskStore.set(`${pathSlug}:${gatewayTaskId}`, task);
           return rpcResult(id, task);
         }
       }
 
       const task = {
-        taskId,
-        id: taskId,
+        taskId: gatewayTaskId,
+        id: gatewayTaskId,
         sessionId: contextId,
         contextId,
         status: {
@@ -574,7 +590,7 @@ Deno.serve(async (req: Request) => {
         state: "completed",
         metadata: { sequenceNumber: 1, sbAvailable: !!sb, legacyMode, pathSlug, inboundDebug },
       };
-      taskStore.set(`${pathSlug}:${taskId}`, task);
+      taskStore.set(`${pathSlug}:${gatewayTaskId}`, task);
       return rpcResult(id, task);
     }
 

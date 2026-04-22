@@ -148,8 +148,17 @@ export type AgentUiMessage = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
-  /** If set, this message is a reply to another message in the same channel (Discord-style thread). */
+  /**
+   * UI-only: parent message id for nested display in the hub (not an A2A wire field).
+   * A2A uses `contextId` + `referenceTaskIds` on `Message` for protocol semantics.
+   */
   replyToId?: string | null;
+  /** A2A v1 `Message.contextId` when known (same across turns in one conversation). */
+  contextId?: string | null;
+  /** A2A v1 `Message.referenceTaskIds` when known. */
+  referenceTaskIds?: string[];
+  /** A2A v1 `Message.messageId` when known. */
+  a2aMessageId?: string | null;
   components?: RenderedComponent[];
   taskId?: string;
   traceId?: string;
@@ -959,6 +968,7 @@ export function useAgent(scope: AgentChatScope = { kind: 'default' }) {
                 taskId: result.taskId,
                 userText,
                 assistantText: asstText,
+                contextId: result.sessionId,
               });
             }
             void streamAssistantText(workingId, asstText);

@@ -325,8 +325,47 @@ function normalizeToken(token?: string | null): string | null {
   return token.trim().replace(/^['"]|['"]$/g, '');
 }
 
+function newA2aMessageId(): string {
+  try {
+    const c = globalThis.crypto as Crypto | undefined;
+    if (c?.randomUUID) return c.randomUUID();
+  } catch {
+    /* ignore */
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function textFromMessageParts(msg: Record<string, unknown> | undefined): string {
+  if (!msg) return '';
+  const parts = msg.parts as unknown;
+  if (!Array.isArray(parts)) return '';
+  return (parts as Record<string, unknown>[])
+    .map((p) => {
+      if (typeof p.text === 'string') return p.text;
+      if (typeof p.content === 'string') return p.content;
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
 function normalizeTaskSubmit(input: unknown): A2aTaskSubmitResponse {
   const root = (input ?? {}) as Record<string, unknown>;
+  /** A2A v1: SendMessageResponse is exactly one of `task` | `message`. */
+  const standaloneMsg = root.message as Record<string, unknown> | undefined;
+  if (standaloneMsg && typeof standaloneMsg === 'object' && !root.task) {
+    const mid = String(standaloneMsg.messageId ?? standaloneMsg.message_id ?? '').trim() || newA2aMessageId();
+    const ctx = String(standaloneMsg.contextId ?? standaloneMsg.context_id ?? mid).trim();
+    const body = textFromMessageParts(standaloneMsg);
+    return {
+      taskId: mid,
+      sessionId: ctx,
+      messageOnly: true,
+      status: 'completed',
+      output: body || undefined,
+    };
+  }
+
   const o = ((root.task as Record<string, unknown> | undefined) ?? root) as Record<string, unknown>;
   const idRaw = o.taskId ?? o.task_id ?? o.id ?? o.requestId;
   if (idRaw === undefined || idRaw === null || String(idRaw).trim() === '') {
@@ -381,6 +420,7 @@ function normalizeTaskSubmit(input: unknown): A2aTaskSubmitResponse {
   return {
     taskId,
     sessionId,
+    messageOnly: false,
     status,
     traceId: typeof traceId === 'string' ? traceId : undefined,
     output: output || undefined,
@@ -588,23 +628,24 @@ export class MockA2AProvider implements RemoteAgentProvider {
           // eslint-disable-next-line no-console
           console.log('[A2A][oauth] no oauthAccessToken attached to SendMessage');
         }
-        const payload = {
-          message: {
-            role: 'ROLE_USER',
-            parts: [{ text: input.userMessage }],
-            metadata: {
-              ...(input.metadata ?? {}),
-              ...(input.oauthAccessToken ? { oauthAccessToken: input.oauthAccessToken } : {}),
-            },
+        /** A2A v1 SendMessageRequest: `message` (required), `configuration`, `metadata` — context/task refs live on `Message`. */
+        const message: Record<string, unknown> = {
+          messageId: newA2aMessageId(),
+          role: 'ROLE_USER',
+          parts: [{ text: input.userMessage }],
+          metadata: {
+            ...(input.metadata ?? {}),
+            ...(input.oauthAccessToken ? { oauthAccessToken: input.oauthAccessToken } : {}),
           },
-          taskId: input.taskId,
-          contextId: input.contextId,
-          referenceTaskIds: input.referenceTaskIds ?? [],
-          oauthAccessToken: input.oauthAccessToken,
-          credentials: input.oauthAccessToken ? { accessToken: input.oauthAccessToken } : undefined,
-          context: input.context,
-          metadata: input.metadata ?? {},
+        };
+        if (input.contextId?.trim()) message.contextId = input.contextId.trim();
+        if (input.taskId?.trim()) message.taskId = input.taskId.trim();
+        if (input.referenceTaskIds?.length) message.referenceTaskIds = input.referenceTaskIds;
+
+        const payload: Record<string, unknown> = {
+          message,
           ...(input.configuration ? { configuration: input.configuration } : {}),
+          ...(input.metadata && Object.keys(input.metadata).length ? { metadata: input.metadata } : {}),
         };
         // returnImmediately must use JSON-RPC SendMessage (or JSON body); streaming path is SSE-only on many agents.
         const returnImmediately = Boolean(input.configuration?.returnImmediately);

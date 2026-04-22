@@ -56,6 +56,8 @@ export type A2aTaskInput = {
 export type A2aTaskSubmitResponse = {
   taskId: string;
   sessionId: string;
+  /** True when the agent returned a standalone `Message` (no `Task`) per A2A SendMessageResponse — no GetTask polling. */
+  messageOnly?: boolean;
   status: 'queued' | 'running' | 'input_required' | 'auth_required' | 'completed' | 'failed' | 'cancelled';
   traceId?: string;
   output?: string;
