@@ -23,6 +23,17 @@ function upstreamBase(): string {
   return u;
 }
 
+function applyDefaultSupabaseKeys(headers: Headers): void {
+  const anon = process.env.SUPABASE_ANON_KEY?.trim();
+  if (!anon) return;
+  if (!headers.has('authorization')) {
+    headers.set('authorization', `Bearer ${anon}`);
+  }
+  if (!headers.has('apikey')) {
+    headers.set('apikey', anon);
+  }
+}
+
 export async function proxyToA2aGateway(pathWithQuery: string, incoming: Request): Promise<Response> {
   const base = upstreamBase();
   const path = pathWithQuery.startsWith('/') ? pathWithQuery : `/${pathWithQuery}`;
@@ -33,14 +44,32 @@ export async function proxyToA2aGateway(pathWithQuery: string, incoming: Request
     const v = incoming.headers.get(name);
     if (v) headers.set(name, v);
   }
+  applyDefaultSupabaseKeys(headers);
 
   const method = incoming.method;
   const hasBody = method !== 'GET' && method !== 'HEAD';
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: hasBody ? await incoming.text() : undefined,
-  });
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: hasBody ? await incoming.text() : undefined,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(
+      JSON.stringify({
+        error: 'upstream_fetch_failed',
+        message: msg,
+        upstream: url.replace(/\/\/[^/]+\//, '//…/'),
+      }),
+      {
+        status: 502,
+        headers: { 'content-type': 'application/json' },
+      }
+    );
+  }
 
   const out = new Headers();
   const ct = res.headers.get('content-type');

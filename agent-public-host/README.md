@@ -16,10 +16,11 @@ Headers copied: `authorization`, `content-type`, `a2a-version`, `accept`, `x-sup
 ## Vercel setup
 
 1. Create a **new Vercel project** and set the root directory to **`Frontier/agent-public-host`** (or deploy this folder as its own repo).
-2. **Environment variable** (Production + Preview as needed):
+2. **Environment variables** (Production + Preview as needed):
 
    - `SUPABASE_A2A_GATEWAY_URL` — full URL, no trailing slash, e.g.  
      `https://<project-ref>.supabase.co/functions/v1/a2a-gateway`
+   - `SUPABASE_ANON_KEY` — same value as **`EXPO_PUBLIC_SUPABASE_ANON_KEY`** in your Expo app. The proxy injects `Authorization` + `apikey` when a caller does not send them, which avoids failed upstream calls and confusing **502**s from some clients.
 
 3. Attach your **custom domain** in Vercel (e.g. `agents.yourdomain.com`).
 
